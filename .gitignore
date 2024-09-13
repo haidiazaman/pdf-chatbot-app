@@ -192,3 +192,4 @@ model_ts*.txt
 src/upernet/data/ADEChallengeData2016
 
 temp.csv
+pdf-chatbot-app/data
