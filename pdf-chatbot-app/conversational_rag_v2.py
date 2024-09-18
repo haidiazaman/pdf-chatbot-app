@@ -1,10 +1,10 @@
 print()
-
-import os
+# import os
 import glob
 import time
 import argparse
 from tqdm import tqdm
+import ollama
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -16,16 +16,14 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_community.chat_message_histories import ChatMessageHistory
 # from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
+# from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 import warnings
 # from urllib3.exceptions import NotOpenSSLWarning
 # Suppress all warnings
 warnings.filterwarnings("ignore")
 # Suppress NotOpenSSLWarning from urllib3
 warnings.filterwarnings("ignore", module='urllib3')
-
-
-
 
 
 def load_pdfs(file_paths):
@@ -64,7 +62,6 @@ def get_session_history(session_id: str):
         chat_history_store[session_id] = ChatMessageHistory()
     return chat_history_store[session_id]
 
-
 def create_huggingface_retriever(folder_path,embedding_model_name):
     files_paths = glob.glob(f"{folder_path}/*.pdf")
     print()
@@ -85,6 +82,8 @@ def create_huggingface_retriever(folder_path,embedding_model_name):
     print(f"number of chunks: {len(all_chunks)}")
 
     # setup embedding model
+    print()
+    print("instantiating HuggingFaceEmbeddings...")
     model_kwargs = {'device': 'cpu'}
     encode_kwargs = {'normalize_embeddings': False}
     hf_embedding_model = HuggingFaceEmbeddings(
@@ -92,6 +91,7 @@ def create_huggingface_retriever(folder_path,embedding_model_name):
         model_kwargs=model_kwargs,
         encode_kwargs=encode_kwargs
     )
+    print("hf_embedding_model created!")
 
     # setup vectordb, using HF embedding model
     start_time=time.time()
@@ -112,10 +112,7 @@ def create_huggingface_retriever(folder_path,embedding_model_name):
 
     return retriever_hf
 
-
-def create_conversational_rag_chain(retriever_hf,llm_model_name):
-
-    print("creating custom RAG Chat LLM...")
+def instantiate_history_aware_retriever(retriever_hf,llm_model_name):
     # setup llm chat model using ollama
     llm_model = ChatOllama(
         model=llm_model_name,
@@ -145,44 +142,71 @@ def create_conversational_rag_chain(retriever_hf,llm_model_name):
         prompt=system_input_prompt
     )
 
-    # setup system RAG QnA prompt
-    system_rag_qna_prompt = (
-        "You are an assistant for question-answering tasks. "
-        "Use the following pieces of retrieved context to answer "
-        "the question. If you don't know the answer, say that you "
-        "don't know. Use three sentences maximum and keep the "
-        "answer concise."
+    return history_aware_retriever
+
+def format_chat_history(chat_history):
+    """
+    this function returns empty list if there is no chat_history
+    """
+
+    formatted_chat_history = [
+        {"role": "human", "content": message.content} if isinstance(message, HumanMessage) else
+        {"role": "ai", "content": message.content}
+        for message in chat_history.messages
+    ]
+
+    return formatted_chat_history
+
+def manual_rag_with_ollama(retrieved_documents, formatted_chat_history, input_query, ollama_model_name="llama3.1"):
+    """
+    Manually performs RAG using retrieved documents from  history-aware-retriever and streams results from the Ollama model.
+    
+    Args:
+        session_id (str): The session ID to fetch chat history.
+        input_query (str): The user's input query.
+        history_aware_retriever: The retriever to get relevant documents.
+        ollama_model_name (str): The name of the Ollama model to use.
+    """
+    
+    # Step 2: Format the retrieved documents as context
+    retrieved_references = "\n\n".join([doc.page_content for doc in retrieved_documents])
+    
+    # Step 3: Create a prompt that integrates the retrieved context and input query
+    input_prompt = (
+        f"You are an assistant for question-answering tasks. You must reference information from the retrieved_references to answer the input_query. "
+        f"You must also reference the formatted_chat_history to take into account conversation flow and to ensure that the response is relevant to both the current query and prior conversation. "
+        f"Use five sentences maximum and keep the answer concise. Also, if the input_query is a yes or no question, you must only answer yes or no."
         "\n\n"
-        "{context}"
-    )
-    system_rag_prompt = ChatPromptTemplate.from_messages(
-        [
-            ('system',system_rag_qna_prompt),
-            MessagesPlaceholder("chat_history"),
-            ('human',"{input}"),
-        ]
+        f"retrieved_references: \n{retrieved_references}"
+        "\n\n"
+        f"formatted_chat_history: \n{formatted_chat_history}"
+        "\n\n"
+        f"input_query: \n{input_query}"
     )
 
-    # instantiate qna_chain
-    qna_chain = create_stuff_documents_chain(llm=llm_model,prompt=system_rag_prompt)
+    # Step 4: Pass the prompt to the Ollama LLM and stream the response
+    # print("Streaming response from Ollama...")
+    print("LLM Response:")
 
-    # instantiate rag_chain
-    rag_chain = create_retrieval_chain(retriever=history_aware_retriever,combine_docs_chain=qna_chain)
-
-    # create overall conversational RAG Chain
-    conversational_rag_chain = RunnableWithMessageHistory(
-        runnable=rag_chain,
-        get_session_history=get_session_history,
-        input_messages_key="input",
-        history_messages_key="chat_history",
-        output_messages_key="answer"
+    stream = ollama.chat(
+        model=ollama_model_name,
+        messages=[{'role': 'user', 'content': input_prompt}],
+        stream=True
     )
 
-    print("RAG Chat LLM creation complete!")
-    return conversational_rag_chain
+    response = ''
+    # Stream and display the output from Ollama as it generates
+    for chunk in stream:
+        print(chunk['message']['content'], end='', flush=True)
+        response += chunk['message']['content']  # Append each chunk to the answer
 
+    return response
 
 def main(folder_path,embedding_model_name,llm_model_name):
+
+    session_id = "1" # hardcode this for temp fix since there is no persistence implemented
+
+    # Initialise embedding and llm model_name
     if embedding_model_name is None:
         embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
     if llm_model_name is None:
@@ -190,58 +214,71 @@ def main(folder_path,embedding_model_name,llm_model_name):
 
     # Create the Hugging Face retriever
     retriever_hf = create_huggingface_retriever(folder_path=folder_path,embedding_model_name=embedding_model_name)
-    # Create the conversational RAG chain
-    conversational_rag_chain = create_conversational_rag_chain(retriever_hf=retriever_hf,llm_model_name=llm_model_name)
+    # Create the history-aware-retriever
+    history_aware_retriever = instantiate_history_aware_retriever(retriever_hf=retriever_hf,llm_model_name=llm_model_name)
 
-    # Initialize the chat loop
     print()
+    print("########################################")
+    print("########## START CONVERSATION ##########")
+    print("########################################")
     print()
     print("You can now start chatting with the LLM.")
-    print("Add '--show contexts' to the end of the input to view the contexts referenced by the LLM for answer generation.")
+    print("Add '--show references' to the end of the input to view the retrieved context chunks referenced by the LLM for answer generation.")
     print("Type 'end session' to stop the conversation.")
+    print()
 
-    session_id = '1'  # Can be replaced with a unique session ID if needed
-
+    # Initialize the chat loop
     while True:
-        print()
-        print()
         # Get user input
         full_user_input = input("User input: ")
-
-        # Only take the first part of the user input if --show contexts is used
+        # Only take the first part of the user input if --show references is used
         user_input = full_user_input.split("--")[0]
 
         # End session if user types 'end session'
         if user_input.lower() == "end session":
             print("Ending session. Goodbye!")
             break
-        
-        # Invoke the conversational RAG chain with the user input
-        start_time = time.time()
-        response = conversational_rag_chain.invoke(
-            input={'input': user_input},
-            config={'configurable': {'session_id': session_id}}
-        )
-        
-        # Get the model's answer and print it
-        answer = response['answer']
-        print(f"LLM Assistant: {answer}")
-        print(f"time taken: {round(time.time()-start_time,2)}s")
 
-        # Show the contexts if user requests
-        if full_user_input.split("--")[-1]=="show contexts":
-            print()
-            print("contexts referenced:")
-            for d in response["context"]:
-                print(f"page {d.metadata['page']} of {d.metadata['source'].split('/')[-1]}")
-                print(f"content: {d.page_content}")
+        # get current chat history
+        current_chat_history = get_session_history(session_id)
+        # format current chat history
+        formatted_chat_history = format_chat_history(current_chat_history)
+
+        # retrieve documents using history_aware_retriever
+        retrieved_documents = history_aware_retriever.invoke(
+            {
+                'chat_history':formatted_chat_history,
+                'input':user_input
+            }
+        )
+
+        # invoke manual_rag_with_ollama function  and show the results, need to store for chat history update
+        response = manual_rag_with_ollama(
+            retrieved_documents=retrieved_documents, 
+            formatted_chat_history=formatted_chat_history, 
+            input_query=user_input, 
+            ollama_model_name=llm_model_name
+        )
+
+        # update chat history with latest LLM output - add the response and input query to the current_chat_history
+        current_chat_history.add_user_message(user_input)
+        current_chat_history.add_ai_message(response)
+        
+        # Show the references if user requests
+        # if full_user_input.split("--")[-1]=="show references":
+        print("\n")
+        if len(full_user_input.split("--"))>1: # just check for non empty string will suffice jic of misspelling
+            print("### preparing references... ###")
+            time.sleep(2)
+            print("References:")
+            for i,d in enumerate(retrieved_documents):
+                time.sleep(1)
+                print(f"{i+1} From: page {d.metadata['page']} of {d.metadata['source'].split('/')[-1]}")
+                print(f"Content: {d.page_content}")
                 print()
 
 
-
 if __name__=="__main__":
-    print()
-
     parser = argparse.ArgumentParser(description="Directly use Conversational RAG with custom PDF documents in terminal.")
     # Add arguments
     parser.add_argument("--folder_path", type=str, help="input absolute folder path to folder of pdfs", required=True)
@@ -260,3 +297,12 @@ if __name__=="__main__":
         embedding_model_name=args.embedding_model_name,
         llm_model_name=args.llm_model_name
     )
+
+# current bottleneck is the history_aware_retriever generating contexts with conversation history reference, but 2-3s shud be fine just like chatgpt
+# 3. if cannot find reelvant references, dont return any 
+    # - context refernces must be > sim_score, cannot just take top K
+# need to work more on the evaluation part tmr - what daniel d discuessed 
+
+# sample queries
+# do you know about high dimensional problems in statistical learning? yes or no.
+# explain in which cases can ridge regression do it with regards to p and N in high dimensional?  --show references
