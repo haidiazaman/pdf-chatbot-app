@@ -191,6 +191,4 @@ model_ts*.txt
 # Upernet data
 src/upernet/data/ADEChallengeData2016
 
-temp.csv
-pdf-chatbot-app/data
-rag-evaluation/GoldenDataSet_RAG.xlsx
+data
