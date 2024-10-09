@@ -359,7 +359,11 @@ if __name__=="__main__":
 # current bottleneck is the history_aware_retriever generating contexts with conversation history reference, but 2-3s shud be fine just like chatgpt
 # 3. if cannot find reelvant references, dont return any 
     # - context refernces must be > sim_score, cannot just take top K
+# check for hallucinations then return hard coded output like IBM code
 
 # sample queries
 # do you know about high dimensional problems in statistical learning? yes or no.
 # explain in which cases can ridge regression do it with regards to p and N in high dimensional? --show references
+
+# sample terminal call
+# python3 conversational_rag_v2.py --folder_path /Users/I748920/Desktop/pdf-chatbot-app/data/short-chap18-elements-of-statistical-learning-book
