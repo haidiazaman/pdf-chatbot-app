@@ -12,8 +12,9 @@ To run app: do
 * python flask_app.py
 
 # to do
+* get familiar with HTML coding
 * stream output
 * make it work for multiple pdfs upload
-* beautfiy the frontend
+* beautfiy the frontend (CSS?)
 * show loading... after upload (not important)
 * start to evaluate and improve RAG (do in notebook)
