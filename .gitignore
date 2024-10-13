@@ -192,3 +192,4 @@ model_ts*.txt
 src/upernet/data/ADEChallengeData2016
 
 data
+app/temp_data

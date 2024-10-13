@@ -1,5 +1,32 @@
-<form method="POST">
+<!-- <form method="POST">
     <p> Enter your query for the chatbot</p>
     <input name="text">
     <input type="submit">
-</form>
+</form> -->
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+</head>
+<body>
+    <h1>Chat with the PDF Chatbot</h1>
+
+    <!-- Chat form -->
+    <form method="POST">
+        <label for="text">Enter your query for the chatbot:</label>
+        <input type="text" name="text" id="text" required>
+        <button type="submit">Send</button>
+    </form>
+
+    <!-- LLM Response Output -->
+    <div class="response-section">
+        <p>LLM Response: {{ response }}</p>
+    </div>
+
+
+</body>
+</html>
