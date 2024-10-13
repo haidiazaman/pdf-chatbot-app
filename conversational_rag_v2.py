@@ -1,5 +1,4 @@
 print()
-# import os
 import glob
 import time
 import argparse
@@ -366,4 +365,4 @@ if __name__=="__main__":
 # explain in which cases can ridge regression do it with regards to p and N in high dimensional? --show references
 
 # sample terminal call
-# python3 conversational_rag_v2.py --folder_path /Users/I748920/Desktop/pdf-chatbot-app/data/short-chap18-elements-of-statistical-learning-book
+# python3 conversational_rag_v2.py --folder_path data/short-chap18-elements-of-statistical-learning-book
