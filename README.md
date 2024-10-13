@@ -8,6 +8,8 @@ Note to self: Will need to think about the package dependecy if using Ollama wil
 
 
 # to do
-* show loading... after upload
 * stream output
 * make it work for multiple pdfs upload
+* beautfiy the frontend
+* show loading... after upload (not important)
+* start to evaluate and improve RAG (do in notebook)
