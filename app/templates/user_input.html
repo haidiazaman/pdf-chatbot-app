@@ -1,10 +1,3 @@
-<!-- <form method="POST">
-    <p> Enter your query for the chatbot</p>
-    <input name="text">
-    <input type="submit">
-</form> -->
-
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,16 +10,33 @@
 
     <!-- Chat form -->
     <form method="POST">
-        <label for="text">Enter your query for the chatbot:</label>
+        <p>Enter your query for the chatbot. Add --references at the back of your query to get the references used by the LLM to generate the answer. </p>
+        <label for="text">Enter query:</label>
         <input type="text" name="text" id="text" required>
         <button type="submit">Send</button>
     </form>
 
-    <!-- LLM Response Output -->
+    <!-- Conversation History -->
     <div class="response-section">
-        <p>LLM Response: {{ response }}</p>
+        <h2>Conversation History:</h2>
+        <div>
+            {% for message in chat_history %}
+                <p>{{ message|safe }}</p>
+            {% endfor %}
+        </div>
     </div>
-
 
 </body>
 </html>
+
+<!-- archive -->
+<!-- <form method="POST">
+    <p> Enter your query for the chatbot</p>
+    <input name="text">
+    <input type="submit">
+</form> -->
+
+<!-- LLM Response Output -->
+<!-- <div class="response-section">
+    <p>LLM Response: {{ response }}</p>
+</div> -->

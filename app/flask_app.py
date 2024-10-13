@@ -1,12 +1,13 @@
 import os
 from flask import Flask, redirect, render_template, request, session, url_for
-from scripts.rag_app import RAGChatbot 
+from scripts.rag_chatbot_class import RAGChatbot 
 
 class RAG_App:
     def __init__(self):
         self.app = Flask(__name__,template_folder='templates')
         self.folder_path = 'temp_data' # hardcode name of folder to save uploaded files to
         self.rag_chatbot = None
+        self.display_chat_history = []
 
         # Define routes after initializing the app object
         # this replaces the @app.route("/") commonly used before the Flask functions
@@ -19,6 +20,7 @@ class RAG_App:
 
     def upload_pdfs(self):
         if request.method == 'POST':
+            os.makedirs(self.folder_path, exist_ok=True)  # Create folder if it doesn't exist
             f = request.files['file']
             filename = os.path.join(self.folder_path,f.filename) # need to ensure the folder temp_date exists
             f.save(filename)
@@ -37,7 +39,8 @@ class RAG_App:
 
         # run the python logic here
         if request.method == 'POST':
-            user_input = request.form.get('text')
+            full_user_input = request.form.get('text')
+            user_input = full_user_input.split("--")[0]
 
             current_chat_history = self.rag_chatbot.get_session_history()
             formatted_chat_history = self.rag_chatbot.format_chat_history(current_chat_history)
@@ -58,14 +61,28 @@ class RAG_App:
                 ollama_model_name=self.rag_chatbot.llm_model_name
             )
 
+            if len(full_user_input.split("--"))>1:
+                response += '<br><br>REFERENCES'
+                for i,d in enumerate(retrieved_documents):
+                    response += '<br>'
+                    doc_details = f"{i+1} From: page {d.metadata['page']} of {d.metadata['source'].split('/')[-1]}"
+                    doc_content = f"Content: {d.page_content}"
+                    response += f"<br>{doc_details}"
+                    response += f"<br>{doc_content}"
+
             # update chat history with latest user input and LLM output - add the input query and response to the current_chat_history
             current_chat_history.add_user_message(user_input)
             current_chat_history.add_ai_message(response)
 
-        return render_template('user_input.html', response=response)
+            # update display, this will be the object displayed in webpage - long string below directly formats the string in html
+            self.display_chat_history.append(f"<span style='font-size: 1.2em; font-weight: bold;'>User: </span> {user_input}")
+            self.display_chat_history.append(f"<span style='font-size: 1.2em; font-weight: bold;'>LLM: </span> {response}")
+
+        return render_template('user_input.html', response=response, chat_history=self.display_chat_history)
     
-    # show entire chat history
-    # change the query to be at the bottom
+    # show loading... after upload
+    # stream output
+    # make it work for multiple pdfs upload
 
     def run(self):
         self.app.run()
@@ -79,3 +96,8 @@ if __name__=="__main__":
     # sample queries
     # do you know about high dimensional problems in statistical learning? yes or no.
     # explain in which cases can ridge regression do it with regards to p and N in high dimensional? --show references
+
+
+            # # update display, this will be the object displayed in webpage
+            # self.display_chat_history.append(f"User: {user_input}")
+            # self.display_chat_history.append(f"LLM: {response}")
