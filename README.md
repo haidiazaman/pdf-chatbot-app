@@ -18,3 +18,4 @@ To run app: do
 * beautfiy the frontend (CSS?)
 * show loading... after upload (not important)
 * start to evaluate and improve RAG (do in notebook)
+* note: need to check the chunk size for the document chunking, currently the embedding model is HF sentence-transformer/all-mpnet-base-v2 which has max_seq_length=384 (i.e. ~280 words) so need to ensure the current chunk size during chunking is <= to that amount)
