@@ -88,6 +88,7 @@ class RAG_App:
         self.app.run()
 
 if __name__=="__main__":
+    print("NOTE: Stop and run ollama app first if not done so then rerun!!\n")
     rag_app = RAG_App()
     rag_app.run()
 
